@@ -1,0 +1,778 @@
+/*
+ * Theme echoes the website project's alpine palette
+ * (../../website/src/styles/theme.css): cream paper, alpine blue, ink text.
+ *
+ * Font stacks match the site's, minus its Google Fonts @import — this app has a
+ * strict CSP and must work offline, so the named faces are simply used when
+ * present and fall back to Georgia / system sans / Menlo when not.
+ */
+:root {
+  /* Alpine palette, lifted from the website */
+  --paper: #f5f0e6;
+  --paper-alt: #eee7d6;
+  --surface: #fbf8f0;
+  --ink: #202632;
+  --blue: #1f4a6d;
+  --blue-light: #2e6c93;
+  --blue-deep: #163a57;
+  --blue-wash: #e3ecf3;
+  --forest: #3e6b4f;
+  --slate: #574f3c;
+  --line: #dad0bb;
+
+  /* Semantic roles */
+  --bg: var(--paper);
+  --panel: var(--paper-alt);
+  --panel-2: var(--surface);
+  --text: var(--ink);
+  --muted: #8a7f66;
+  --accent: var(--blue);
+
+  /* Timer states — kept vivid, since these signal what to do mid-solve */
+  --green: var(--forest);
+  --amber: #a76a1c;
+  --red: #b3261e;
+
+  /* Softer variants for penalties in the solve list, where a DNF is a label
+     rather than an alert and shouldn't pull the eye off the times. */
+  --amber-soft: #a67c33;
+  --red-soft: #a05a52;
+
+  /*
+   * Backdrop for the timer area. This is the pre-JS default (matching the
+   * default setting, so there is no flash on launch); the Settings dropdown
+   * overrides it at runtime. Presets live in src/renderer/backgrounds.ts.
+   */
+  --timer-bg: url("assets/rainier.jpeg");
+  /* How much cream is washed over the image. Higher = subtler photo, more
+     legible timer. */
+  --timer-bg-scrim: 74%;
+
+  --font-serif: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-sans: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--font-sans);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/*
+ * `minmax(0, 1fr)` and the `min-height: 0` rules below are load-bearing.
+ * Grid and flex items default to `min-height: auto`, meaning they refuse to
+ * shrink below their content. Once a session had enough solves, the solve list
+ * pushed its column past 100vh and dragged the stats bar off the bottom of the
+ * window instead of scrolling.
+ */
+#app {
+  display: grid;
+  grid-template-columns: 190px 1fr 300px;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Discreet scrollbars: invisible at rest, faintly there while pointing at the
+   list, so scroll position is still discoverable without a chrome bar. */
+.solve-list,
+.session-list,
+.modal {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.solve-list:hover,
+.session-list:hover,
+.modal:hover {
+  scrollbar-color: color-mix(in srgb, var(--slate) 30%, transparent) transparent;
+}
+
+.solve-list::-webkit-scrollbar,
+.session-list::-webkit-scrollbar,
+.modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.solve-list::-webkit-scrollbar-track,
+.session-list::-webkit-scrollbar-track,
+.modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.solve-list::-webkit-scrollbar-thumb,
+.session-list::-webkit-scrollbar-thumb,
+.modal::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 120ms linear;
+}
+
+.solve-list:hover::-webkit-scrollbar-thumb,
+.session-list:hover::-webkit-scrollbar-thumb,
+.modal:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--slate) 28%, transparent);
+  background-clip: content-box;
+}
+
+.solve-list::-webkit-scrollbar-thumb:hover,
+.session-list::-webkit-scrollbar-thumb:hover,
+.modal::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--slate) 55%, transparent);
+  background-clip: content-box;
+}
+
+/* ------------------------------- sidebar ------------------------------- */
+
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 10px 10px;
+}
+
+.drag-strip {
+  height: 38px;
+  -webkit-app-region: drag;
+  flex: none;
+}
+
+/* Terminal-style labels, as on the site. */
+.sidebar-label,
+.solves-head,
+.stat .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sidebar-label,
+.solves-head {
+  padding: 6px 8px;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.session-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font: 13.5px var(--font-sans);
+  text-align: left;
+  width: 100%;
+}
+
+.session-item:hover {
+  background: var(--surface);
+}
+
+.session-item.active {
+  background: var(--blue-wash);
+  border-left-color: var(--blue);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.session-item .count {
+  font: 11px/1 var(--mono);
+  color: var(--muted);
+}
+
+.session-item.active .count {
+  color: var(--blue-light);
+}
+
+.ghost-btn {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--blue);
+  border-radius: 6px;
+  padding: 7px 9px;
+  cursor: pointer;
+  font: 12.5px var(--font-sans);
+  margin-top: 8px;
+  width: 100%;
+}
+
+.ghost-btn:hover {
+  border-color: var(--blue);
+  background: var(--blue-wash);
+}
+
+.sidebar-footer {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+/* --------------------------------- main -------------------------------- */
+
+.main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.scramble-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+}
+
+.scramble-wrap {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.scramble {
+  font: 500 19px/1.4 var(--mono);
+  letter-spacing: 0.01em;
+  word-spacing: 0.35em;
+  color: var(--ink);
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-app-region: no-drag;
+}
+
+.scramble.pending {
+  color: var(--muted);
+}
+
+.scramble-meta {
+  font: 10.5px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.nav-btn {
+  -webkit-app-region: no-drag;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--blue);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: var(--blue-wash);
+  border-color: var(--blue);
+}
+
+.nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.timer-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 0;
+  overflow: hidden;
+  background-image: var(--timer-bg);
+  background-size: cover;
+  background-position: center;
+}
+
+/* Cream wash over the photo so the timer keeps its contrast. */
+.timer-area::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--paper) var(--timer-bg-scrim), transparent);
+  pointer-events: none;
+}
+
+/* Lift the timer above the scrim. */
+.timer,
+.timer-hint {
+  position: relative;
+  z-index: 1;
+}
+
+.timer {
+  font: 300 96px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  transition: color 90ms linear;
+}
+
+.timer.holding {
+  color: var(--amber);
+}
+
+.timer.ready {
+  color: var(--green);
+}
+
+.timer.inspecting {
+  color: var(--blue);
+}
+
+.timer.warn {
+  color: var(--red);
+}
+
+.timer-hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  height: 18px;
+}
+
+kbd {
+  font: 11px var(--mono);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--blue);
+}
+
+/*
+ * 3D scramble preview, pinned to the bottom of the solves column.
+ *
+ * `flex: none` is what stops the solve list from pushing it off-screen: the
+ * list is the only flexible child, so it absorbs all remaining height and
+ * scrolls internally while this box keeps its size.
+ */
+.cube-panel {
+  flex: none;
+  height: 240px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Hidden during a solve. `visibility` rather than `display` so the box keeps
+   its space — collapsing it would make the solve list jump mid-solve. */
+.cube-panel.hidden {
+  visibility: hidden;
+}
+
+/* Square viewport: twisty applies a camera view-offset for non-square canvases,
+   which pushes the puzzle off-centre. A 1:1 box sidesteps that entirely. */
+.cube-panel twisty-player {
+  width: 210px;
+  height: 210px;
+}
+
+/* Stats: three rows of three, in the solves panel above the table header. */
+.solve-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px 4px;
+  padding: 10px 12px 11px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.stat {
+  min-width: 0;
+  text-align: center;
+}
+
+.stat .k {
+  display: block;
+  font: 9.5px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat .v {
+  display: block;
+  font: 13.5px/1.4 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* -------------------------------- solves ------------------------------- */
+
+.solves {
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.solves-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 38px 12px 0;
+  flex: none;
+  -webkit-app-region: drag;
+}
+
+.solves-title {
+  font: 600 13px var(--font-sans);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reset-btn {
+  -webkit-app-region: no-drag;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--slate);
+  border-radius: 6px;
+  padding: 3px 9px;
+  font: 11px var(--font-sans);
+  cursor: pointer;
+  flex: none;
+  white-space: nowrap;
+}
+
+.reset-btn:hover:not(:disabled) {
+  color: var(--red);
+  border-color: var(--red);
+  background: #f7e7e5;
+}
+
+.reset-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Armed state, awaiting the confirming second click. */
+.reset-btn.selected {
+  color: var(--red);
+  border-color: var(--red);
+  background: #f7e7e5;
+  font-weight: 600;
+}
+
+.solves-head {
+  display: grid;
+  grid-template-columns: 34px 1fr 62px 62px;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.solves-head .col-t,
+.solves-head .col-a {
+  text-align: right;
+}
+
+.solve-list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.solve-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 62px 62px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font: 12.5px/1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  width: 100%;
+  text-align: left;
+}
+
+.solve-row:hover {
+  background: var(--surface);
+}
+
+.solve-row .n {
+  color: var(--muted);
+}
+
+.solve-row .t,
+.solve-row .a {
+  text-align: right;
+}
+
+.solve-row .a {
+  color: var(--muted);
+}
+
+.solve-row.dnf .t {
+  color: var(--red-soft);
+}
+
+.solve-row.plus2 .t {
+  color: var(--amber-soft);
+}
+
+.load-more {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--line);
+  color: var(--blue);
+  font: 11.5px/1.4 var(--font-sans);
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.load-more:hover {
+  background: var(--blue-wash);
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+/* -------------------------------- modal -------------------------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(32, 38, 50, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  width: 380px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 18px 50px rgba(32, 38, 50, 0.18);
+}
+
+.modal h2 {
+  margin: 0 0 14px;
+  font: 500 18px/1.3 var(--font-serif);
+  color: var(--ink);
+}
+
+.modal .field {
+  margin-bottom: 12px;
+}
+
+.modal label {
+  display: block;
+  font: 10.5px var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.modal input[type="text"],
+.modal input[type="number"],
+.modal select,
+.modal textarea {
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font: inherit;
+}
+
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-wash);
+}
+
+.modal textarea {
+  resize: vertical;
+  min-height: 54px;
+}
+
+.modal .locked-field {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  background: var(--paper-alt);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--slate);
+}
+
+.modal .locked-field .lock {
+  font: 10.5px var(--mono);
+  color: var(--muted);
+}
+
+.modal .checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal .checkbox input {
+  accent-color: var(--blue);
+}
+
+.modal .checkbox label {
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font: 13px var(--font-sans);
+  color: var(--ink);
+}
+
+.modal .scramble-readout {
+  font: 12px/1.5 var(--mono);
+  color: var(--slate);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+  word-break: break-word;
+}
+
+.modal .row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.modal .row.spread {
+  justify-content: space-between;
+}
+
+/* Buttons: cream surface with alpine blue, inverting to solid blue for the
+   primary action. */
+.btn {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--blue);
+  border-radius: 6px;
+  padding: 7px 13px;
+  cursor: pointer;
+  font: inherit;
+  flex: 1;
+}
+
+.btn:hover {
+  background: var(--blue-wash);
+  border-color: var(--blue);
+}
+
+.btn.primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.btn.primary:hover {
+  background: var(--blue-deep);
+  border-color: var(--blue-deep);
+}
+
+.btn.danger {
+  color: var(--red);
+}
+
+.btn.danger:hover {
+  background: #f7e7e5;
+  border-color: var(--red);
+}
+
+.btn.selected {
+  border-color: var(--blue);
+  background: var(--blue-wash);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.big-time {
+  font: 300 40px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+/* Secondary action tucked under a form control (e.g. remove a custom image). */
+.modal .field-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.modal .field-actions .btn {
+  flex: 0 0 auto;
+  font-size: 12px;
+  padding: 4px 10px;
+}

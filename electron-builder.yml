@@ -1,0 +1,44 @@
+appId: net.cubetimer.app
+productName: cubetimer
+copyright: cubetimer
+
+directories:
+  output: release
+  buildResources: build
+
+# esbuild has already bundled everything the app needs into dist/, including
+# cubing.js and its WASM. Nothing from node_modules is required at runtime, so
+# the shipped app is just the Electron runtime plus a couple of megabytes.
+files:
+  - dist/**/*
+  - package.json
+
+# No native modules — node:sqlite is built into Electron's Node — so there is
+# nothing to rebuild per-platform, which is what makes cross-building easy.
+npmRebuild: false
+
+mac:
+  category: public.app-category.utilities
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Unsigned local builds: without this, hardened runtime rejects the app.
+  hardenedRuntime: false
+  gatekeeperAssess: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  category: Utility
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]

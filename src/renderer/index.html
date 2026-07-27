@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none';
+               script-src 'self' 'wasm-unsafe-eval' blob:;
+               worker-src 'self' blob:;
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data: blob:;
+               font-src 'self';
+               connect-src 'self' blob: data:;"
+    />
+    <title>cubetimer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside class="sidebar">
+        <div class="drag-strip"></div>
+        <div class="sidebar-label">Sessions</div>
+        <div id="session-list" class="session-list"></div>
+        <button id="add-session" class="ghost-btn">+ New session</button>
+        <div class="sidebar-footer">
+          <button id="settings-btn" class="ghost-btn">Settings</button>
+          <button id="export-btn" class="ghost-btn">Export</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="scramble-bar">
+          <button id="prev-scramble" class="nav-btn" title="Previous scramble (←)">‹</button>
+          <div class="scramble-wrap">
+            <div id="scramble" class="scramble">Loading scramble…</div>
+            <div id="scramble-meta" class="scramble-meta"></div>
+          </div>
+          <button id="next-scramble" class="nav-btn" title="Next scramble (→)">›</button>
+        </header>
+
+        <section class="timer-area">
+          <div id="timer" class="timer">0.00</div>
+          <div id="timer-hint" class="timer-hint">hold <kbd>space</kbd> to start</div>
+        </section>
+      </main>
+
+      <aside class="solves">
+        <div class="solves-top">
+          <span id="solves-title" class="solves-title"></span>
+          <span id="reset-slot"></span>
+        </div>
+        <div id="stats" class="solve-stats"></div>
+        <div class="solves-head">
+          <span class="col-n">#</span>
+          <span class="col-t">time</span>
+          <span class="col-a">ao5</span>
+          <span class="col-a">ao12</span>
+        </div>
+        <div id="solve-list" class="solve-list"></div>
+        <section id="cube-panel" class="cube-panel"></section>
+      </aside>
+    </div>
+
+    <div id="modal-root"></div>
+    <script type="module" src="index.js"></script>
+  </body>
+</html>
