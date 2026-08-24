@@ -75,6 +75,12 @@ export interface Settings {
   holdMs: number;
   /** Hide the running time while solving. */
   hideTimeWhileSolving: boolean;
+  /**
+   * Dead time after a solve stops during which space won't start anything.
+   * Stops an accidental double-tap of the stop key from immediately kicking
+   * off the next inspection.
+   */
+  postSolveCooldownMs: number;
   lastSessionId: number | null;
   timerBackground: TimerBackgroundId;
   /** Where the window was last placed; null until the window is first moved. */
@@ -86,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   inspection: false,
   holdMs: 550,
   hideTimeWhileSolving: false,
+  postSolveCooldownMs: 1000,
   lastSessionId: null,
   timerBackground: "rainier",
   windowBounds: null,

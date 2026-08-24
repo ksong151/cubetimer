@@ -776,3 +776,10 @@ kbd {
   font-size: 12px;
   padding: 4px 10px;
 }
+
+/* Explanatory line under a settings control. */
+.modal .field-hint {
+  font: 11.5px/1.4 var(--font-sans);
+  color: var(--muted);
+  margin-top: 5px;
+}

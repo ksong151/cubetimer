@@ -51,6 +51,11 @@ let inspectStartPerf = 0;
 let inspectionPenalty: Penalty = "none";
 let calledEight = false;
 let calledTwelve = false;
+/**
+ * Timestamp until which space is ignored, so the second half of an accidental
+ * double-tap on the stop key can't immediately start the next inspection.
+ */
+let cooldownUntil = 0;
 
 const inspectionActive = () =>
   phase === "inspecting" || ((phase === "holding" || phase === "ready") && holdFrom === "inspecting");
@@ -353,6 +358,7 @@ function startSolve(): void {
 async function stopSolve(): Promise<void> {
   const ms = performance.now() - startPerf;
   phase = "idle";
+  cooldownUntil = performance.now() + settings.postSolveCooldownMs;
   setCubeHidden(false);
   cancelAnimationFrame(rafId);
 
@@ -424,6 +430,8 @@ function wireKeys(): void {
     if (e.code === "Space") {
       e.preventDefault();
       if (e.repeat) return;
+      // Only gate a fresh start; a hold already in progress must still release.
+      if (phase === "idle" && performance.now() < cooldownUntil) return;
       if (phase === "idle" && settings.inspection) startInspection();
       else if (phase === "idle" || phase === "inspecting") beginHold();
       return;
@@ -682,6 +690,9 @@ function openSettingsModal(): void {
     const hold = el("input", { type: "number", min: "0", max: "2000", step: "50" }) as HTMLInputElement;
     hold.value = String(settings.holdMs);
 
+    const cooldown = el("input", { type: "number", min: "0", max: "3000", step: "50" }) as HTMLInputElement;
+    cooldown.value = String(settings.postSolveCooldownMs);
+
     // Sentinel option that opens a file picker rather than selecting anything.
     const ADD = "\u0000add";
     const background = el("select") as HTMLSelectElement;
@@ -738,6 +749,7 @@ function openSettingsModal(): void {
         inspection: inspection.checked,
         hideTimeWhileSolving: hide.checked,
         holdMs: Math.max(0, Math.min(2000, Number(hold.value) || 0)),
+        postSolveCooldownMs: Math.max(0, Math.min(3000, Number(cooldown.value) || 0)),
         timerBackground: chosen,
       });
       applyTimerBackground(settings.timerBackground);
@@ -762,6 +774,16 @@ function openSettingsModal(): void {
         el("label", { for: "opt-hide", text: "Hide time while solving" }),
       ),
       el("div", { class: "field" }, el("label", { text: "Hold time before ready (ms)" }), hold),
+      el(
+        "div",
+        { class: "field" },
+        el("label", { text: "Dead time after a solve (ms)" }),
+        cooldown,
+        el("div", {
+          class: "field-hint",
+          text: "Ignores space for this long after a solve stops, so a double-tap can't start the next one.",
+        }),
+      ),
       el(
         "div",
         { class: "field" },
